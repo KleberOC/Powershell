@@ -1,0 +1,107 @@
+Test-Path $Profile
+New-Item -Path $Profile -ItemType File -Force | Out-Null
+Test-Path $Profile
+Add-Content $Profile ('Add-PsSnapin VMware.VimAutomation.Core -ea "SilentlyContinue"')
+notepad $Profile
+
+cd D:\Downloads\VMware\vSphere6.5\NUC
+Add-EsxSoftwareDepot D:\Downloads\VMware\vSphere6.5\VMware-ESXi-6.5.0-4564106-depot.zip
+Add-EsxSoftwareDepot D:\Downloads\VMware\vSphere6.5\sata-xahci-1.28-1-offline_bundle.zip
+New-EsxImageProfile -CloneProfile "ESXi-6.5.0-4564106-standard" -name "ESXi-6.5.0-4564106-NUC" -Vendor "virten.net" -AcceptanceLevel "CommunitySupported"
+Add-EsxSoftwarePackage -ImageProfile "ESXi-6.5.0-4564106-NUC" -SoftwarePackage "sata-xahci"
+Export-ESXImageProfile -ImageProfile "ESXi-6.5.0-4564106-NUC" -ExportToISO -filepath ESXi-6.5.0-4564106-NUC.iso
+Export-ESXImageProfile -ImageProfile "ESXi-6.5.0-4564106-NUC" -ExportToBundle -filepath 
+
+
+
+
+
+
+
+Get-VMHost
+
+$ESXiHosts = "192.168.100.21","192.168.100.22"
+$User = "root"
+$Credential = New-Object –TypeName System.Management.Automation.PSCredential –ArgumentList $User, $PWord 
+Connect-VIServer -Server $ESXiHosts -Credential $Credential
+
+ForEach($ESXi in $ESXiHosts){
+   Stop-VMHost -Force
+
+
+}
+
+
+
+
+ForEach($ESXi in $ESXiHosts){
+    Get-VMHostStorage -VMhost $ESXi | Set-VMHostStorage -SoftwareIScsiEnabled $True
+    Start-Sleep -Seconds 30
+    $HBA = Get-VMHost $ESXi | Get-VMHostHba -Type IScsi | Where {$_.Model -eq "iSCSI Software Adapter"}
+
+
+}
+
+$Targets = "192.168.100.5"
+
+ForEach($ESXi in $ESXiHosts){
+    $ESXi
+    Get-VMHostHba -Type IScsi | Where {$_.Model -eq "iSCSI Software Adapter"}
+    $HBA = Get-VMHost $ESXi | Get-VMHostHba -Type IScsi | Where {$_.Model -eq "iSCSI Software Adapter"}
+    ForEach($Target in $Targets){
+            If(Get-IScsiHbaTarget -IScsiHba $HBA -Type Send | Where {$_.Address -cmatch $Target}){
+            }
+            Else{
+                New-IScsiHbaTarget -IScsiHba $HBA -Address $Target -ChapType Required -ChapName "iscsiinit" -ChapPassword "qwertyuiop12"
+            }
+    
+    }
+
+}
+
+
+
+ForEach($ESXi in $ESXiHosts){
+    Get-VMHostStorage -VMhost $ESXi -RescanAllHba
+    Start-Sleep -Seconds 30
+    Get-VMHostStorage -VMHost $ESXi -RescanVmfs
+    
+}
+
+ForEach($ESXi in $ESXiHosts){
+    Get-Datastore
+}
+
+
+
+Get-Datastore  -Name * -
+
+Import-VApp -Source E:\vcsa\VMware-vCenter-Server-Appliance-6.5.0.5100-4602587_OVF10.ova `
+        -VMHost $ESXiHosts.Item(0) -Datastore "iSCSI-DS1"
+
+Get-VMHost $ESXiHosts.Item(0) | Get-VApp
+
+vCenter Appliance
+VSCA
+192.168.100.23
+
+
+Get-VMHost | Get-VMHostService | Where-Object {$_.key -eq "ntpd"}
+#Get-VMHost | Add-VMHostNtpServer -NtpServer koc-xps.contoso.com
+Get-VMHost | Add-VMHostNtpServer -NtpServer 192.168.100.20
+#Get-VMHost | Remove-VMHostNtpServer -NtpServer 192.168.100.20
+Get-VMHost | Get-VMHostFirewallException | Where {$_.Name -eq "NTP Client"} | Set-VMHostFirewallException -Enabled:$True
+Get-VMHost | Get-VMHostService | Where-Object {$_.key -eq "ntpd"} | Set-VMHostService -Policy Automatic
+Get-VMHost | Get-VMHostService | Where-Object {$_.key -eq "ntpd"} | Stop-VMHostService
+Get-VMHost | Get-VMHostService | Where-Object {$_.key -eq "ntpd"} | Start-VMHostService
+Get-VMHost | Get-VMHostService | Where-Object {$_.key -eq "ntpd"}
+
+
+
+Get-VMHost | Stop-VMHost -Force
+
+Get-VMHost | Get-VMHostStorage
+
+
+
+Disconnect-VIServer -Server * -Force -Confirm:$false
